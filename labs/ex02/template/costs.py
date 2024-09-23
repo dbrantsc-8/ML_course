@@ -16,7 +16,12 @@ def compute_loss(y, tx, w):
         the value of the loss (a scalar), corresponding to the input parameters w.
     """
     # ***************************************************
-    # INSERT YOUR CODE HERE
-    # TODO: compute loss by MSE
+    # MSE
+    loss = 1/(2*tx.shape[0]) * np.sum((y - tx.dot(w))**2) # only one dimension for the sum => no need to specify axis along which we want to sum
+    return loss
+
+    # MAE
+    #loss = 1/(tx.shape[0]) * np.sum(np.abs(y - tx.dot(w)))
+    #return loss
     # ***************************************************
     raise NotImplementedError

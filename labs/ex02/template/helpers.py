@@ -14,7 +14,7 @@ def load_data(sub_sample=True, add_outlier=False):
         delimiter=",",
         skip_header=1,
         usecols=[0],
-        converters={0: lambda x: 0 if "Male" in str(x) else 1},
+        converters={0: lambda x: 0 if b"Male" in x else 1},
     )
     # Convert to metric system
     height *= 0.025
@@ -95,7 +95,7 @@ def batch_iter(y, tx, batch_size, num_batches=1, shuffle=True):
 
     if shuffle:
         # Generate an array of indexes indicating the start of each batch
-        idxs = np.random.randint(max_batches, size=num_batches) * batch_size
+        idxs = np.random.randint(max_batches, size=num_batches) * batch_size # max_batches is the minimum value ad num_batches gives the number of random data we want
         if remainder != 0:
             # Add an random offset to the start of each batch to eventually consider the remainder points
             idxs += np.random.randint(remainder + 1, size=num_batches)
