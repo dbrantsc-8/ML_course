@@ -49,8 +49,8 @@ def stochastic_gradient_descent(y, tx, initial_w, batch_size, max_iters, gamma):
 
     for n_iter in range(max_iters):
         # ***************************************************
-        for y_batch, tx_batch in batch_iter(y, tx, batch_size = batch_size, num_batches=1):
-            grad = compute_stoch_gradient(y_batch, tx_batch, w)
+        for y_b, tx_b in batch_iter(y, tx, batch_size = batch_size, num_batches=1):
+            grad = compute_stoch_gradient(y_b, tx_b, w)
             w = w - gamma*grad
             loss = compute_loss(y, tx, w) # Attention!!! Compute loss on whole dataset, not on the batch
             losses.append(loss)
