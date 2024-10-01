@@ -19,9 +19,9 @@ def build_poly(x, degree):
            [1.  , 1.5 , 2.25]])
     """
     # ***************************************************
-    # COPY YOUR CODE FROM EX03 HERE
-    # polynomial basis function: TODO
-    # this function should return the matrix formed
-    # by applying the polynomial basis to the input data
+    poly = np.ones((len(x), degree + 1))
+    for exp in range(1, degree+1):
+        poly[:, exp] = np.power(x, exp)
+    return poly
     # ***************************************************
     raise NotImplementedError
