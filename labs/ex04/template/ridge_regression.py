@@ -29,4 +29,4 @@ def ridge_regression(y, tx, lambda_):
     right = tx.T.dot(y)
     w = np.linalg.solve(left, right)
     # ***************************************************
-    raise NotImplementedError
+    return w
