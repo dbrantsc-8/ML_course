@@ -23,6 +23,7 @@ The tests will be run in a conda environement created as follow:
 
 ```
 conda env create --file=environment.yml --name=project1-grading
+source ~/anaconda3/etc/profile.d/conda.sh
 conda activate project1-grading
 ```
 
