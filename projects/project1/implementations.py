@@ -1,7 +1,7 @@
 import numpy as np
 
 ###################################################################################################################
-# Loss calculation functions used throughout the file
+# Functions used throughout the file
 ###################################################################################################################
 
 
@@ -35,6 +35,18 @@ def compute_loss_LR(y, tx, w):
         np.log(1 + np.exp(tx.dot(w)))
     )
     return 1 / y.shape[0] * loss_scaled
+
+def sigmoid(t):
+    """Apply sigmoid function on t.
+
+    Args:
+        t: scalar or numpy array
+
+    Returns:
+        scalar or numpy array
+    """
+    result = np.where(t >= 0,  1 / (1 + np.exp(-t)), np.exp(t) / (1 + np.exp(t)))
+    return result
 
 
 ###################################################################################################################
@@ -203,7 +215,7 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
     w = initial_w
     for _ in range(max_iters):
         pred = tx.dot(w)
-        sigmoid_pred = np.exp(pred) / (1 + np.exp(pred))
+        sigmoid_pred = sigmoid(pred)
         grad = 1 / y.shape[0] * tx.T.dot(sigmoid_pred - y)
         w -= gamma * grad
     loss = compute_loss_LR(y, tx, w)
@@ -235,9 +247,10 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     w = initial_w
     for _ in range(max_iters):
         pred = tx.dot(w)
-        sigmoid_pred = np.exp(pred) / (1 + np.exp(pred))
+        sigmoid_pred = sigmoid(pred)
         grad = 1 / y.shape[0] * tx.T.dot(sigmoid_pred - y) + 2 * lambda_ * w
         w -= gamma * grad
     loss = compute_loss_LR(y, tx, w)
 
     return w, loss
+
