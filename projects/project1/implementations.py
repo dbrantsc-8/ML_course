@@ -245,11 +245,19 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
         loss: loss value for the final w vector.
     """
     w = initial_w
-    for _ in range(max_iters):
+    threshold = 1e-8
+    losses = []
+    
+    for iter in range(max_iters):
         pred = tx.dot(w)
         sigmoid_pred = sigmoid(pred)
         grad = 1 / y.shape[0] * tx.T.dot(sigmoid_pred - y) + 2 * lambda_ * w
         w -= gamma * grad
+        if iter % 100 == 0:
+            losses.append(compute_loss_LR(y, tx, w))
+            if len(losses) > 1 and np.abs(losses[-1] - losses[-2]) < threshold:
+                return w, losses[-1]
+            
     loss = compute_loss_LR(y, tx, w)
 
     return w, loss
