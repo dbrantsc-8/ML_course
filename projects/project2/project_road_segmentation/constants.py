@@ -1,0 +1,12 @@
+import torch
+
+IMG_PATCH_SIZE = 128
+STANDARD_PATCH_SIZE = 16
+TEST_IMG_SIZE = 608
+TEST_PATCHES_PER_IMG = 38
+NBR_TEST_IMAGES = 50
+
+if torch.cuda.is_available():
+    NUM_WORKERS = 2
+else:
+    NUM_WORKERS = 0
