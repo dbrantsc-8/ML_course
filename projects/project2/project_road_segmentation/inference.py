@@ -41,8 +41,8 @@ class TestModel:
             utilities.label_to_img(
                 imgwidth = constants.TEST_IMG_SIZE,
                 imgheight = constants.TEST_IMG_SIZE,
-                w = constants.IMG_PATCH_SIZE,
-                h = constants.IMG_PATCH_SIZE,
+                w = constants.STANDARD_PATCH_SIZE,
+                h = constants.STANDARD_PATCH_SIZE,
                 labels = preds[i * constants.TEST_PATCHES_PER_IMG**2 : (i + 1) * constants.TEST_PATCHES_PER_IMG**2],
             )
             for i in range(constants.NBR_TEST_IMAGES)
@@ -55,10 +55,10 @@ class TestModel:
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = models.basic_cnn()
-    model.load_state_dict(torch.load("models/basic_cnn_with_augmentation.pth", map_location=torch.device(device)))
+    model = models.adv_cnn()
+    model.load_state_dict(torch.load("models/adv_cnn_128_with_aug.pth", map_location=torch.device(device)))
     path_test_imgs = 'testing/'
-    path_submission = 'submissions/augmented.csv'
+    path_submission = 'submissions/adv_cnn_128_with_aug.csv'
 
     # Compute mean and standard deviation over whole training set, only needs to be done once
     """train_data = data_process.TrainImgsDataset(path_imgs = 'training/images/', 

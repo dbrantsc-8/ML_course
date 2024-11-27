@@ -187,7 +187,7 @@ def get_dataloaders(num_images, batch_size, data_aug):
     valid_data = data_process.TrainImgsDataset(path_imgs = 'training/images/', 
                                   path_gts = 'training/groundtruth/', 
                                   train = False,
-                                  num_images = int(np.round(num_images/4, 0)), 
+                                  num_images = max(1, int(np.round(num_images/4, 0))), 
                                   transform = transform,
                                   aug = False,
                                   aug_factor = 1)
@@ -227,8 +227,8 @@ def load_test_data(path):
         for i in range(len(img_patches))
         for j in range(len(img_patches[i]))
     ]
-    data = torch.tensor(np.array(data))
-    return np.transpose(data, (0, 3, 2, 1))
+   
+    return torch.tensor(np.array(data))
 
 def label_to_img(imgwidth, imgheight, w, h, labels):
     im = np.zeros([imgwidth, imgheight])

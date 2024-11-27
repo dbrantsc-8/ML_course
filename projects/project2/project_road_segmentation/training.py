@@ -15,11 +15,13 @@ class TrainModel:
             lr = params['lr'], 
             weight_decay = params['weight_decay']
         )
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
-            T_max = params['T_max'],
+            mode = 'min',  
+            factor = 0.1,  
+            patience = 2,   
         )
-        self.criterion = torch.nn.functional.cross_entropy
+        self.criterion = torch.nn.CrossEntropyLoss(weight = params['class_weights'].to(self.device))
     
     def evaluate_pred(self, output, target):
         pred = output.argmax(dim = 1, keepdim = True).to(self.device)
@@ -41,20 +43,18 @@ class TrainModel:
 
         return f1, acc
     
-    def train_epoch(self, train_loader, class_weights, epoch):
+    def train_epoch(self, train_loader, epoch):
         self.model.train()
         loss_hist, acc_hist, f1_hist, lr_hist = [], [], [], []
 
         for batch_idx, (data, target) in enumerate(train_loader):
             data = data.to(self.device)
             target = target.to(self.device)
-            class_weights = class_weights.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
-            loss = self.criterion(output, target, class_weights)
+            loss = self.criterion(output, target)
             loss.backward()
             self.optimizer.step()
-            self.scheduler.step()
 
             tp, tn, fp, fn = self.evaluate_pred(output, target)
             f1, acc = self.compute_scores(tp, tn, fp, fn)
@@ -94,6 +94,8 @@ class TrainModel:
 
         valid_loss /= len(valid_loader.dataset)
         valid_f1, valid_acc = self.compute_scores(tot_tp, tot_tn, tot_fp, tot_fn)
+
+        self.scheduler.step(valid_loss)
 
         print(
             "Validation set: Average loss: {:.4f}, Accuracy: {:.0f} %, F1-score: {:.4f}".format(
@@ -142,10 +144,11 @@ class TrainModel:
         
 
 def main():
+    print(f'Patch size: {constants.IMG_PATCH_SIZE}')
     params = {
         'lr': 1e-3,
-        'weight_decay': 5e-1,
-        'num_epochs': 5,
+        'weight_decay': 1e-3,
+        'num_epochs': 10,
         'num_images': 80,
         'data_augmentation': False,
     }
@@ -154,19 +157,20 @@ def main():
     model = models.ResNet()
     train_loader, valid_loader, class_weights = utilities.get_dataloaders(
         num_images = params['num_images'], 
-        batch_size = 64,
+        batch_size = 128,
         data_aug = params['data_augmentation']
     )
-
-    params['T_max'] = 2*(len(train_loader.dataset) * params['num_epochs']) // train_loader.batch_size
+    params['class_weights'] = class_weights
 
     trainer = TrainModel(model, params, device)
 
     tr_loss_hist, tr_f1_hist, tr_acc_hist, lr_hist = [], [], [], []
     valid_loss_hist, valid_f1_hist, valid_acc_hist = [], [], []
+    patience = 4
+    count = 0
 
     for epoch in range(1, params['num_epochs'] + 1):
-        tr_loss, tr_f1, tr_acc, lr = trainer.train_epoch(train_loader, class_weights, epoch)
+        tr_loss, tr_f1, tr_acc, lr = trainer.train_epoch(train_loader, epoch)
         tr_loss_hist.extend(tr_loss)
         tr_f1_hist.extend(tr_f1)
         tr_acc_hist.extend(tr_acc)
@@ -176,13 +180,23 @@ def main():
         valid_loss_hist.append(valid_loss)
         valid_f1_hist.append(valid_f1)
         valid_acc_hist.append(valid_acc)
+
+        if (len(valid_loss_hist) > 1) and (valid_loss_hist[-1] > valid_loss_hist[-2]):
+            count += 1
+        else:
+            torch.save(model.state_dict(), "/content/drive/MyDrive/ML_project2/models/ResNet_128_no_aug.pth")
+            count = 0
+        
+        if count >= patience:
+            print(f'Training stopped as the validation loss has increased for {patience} consecutive epochs')
+            trainer.plots(
+                tr_f1_hist, tr_acc_hist, tr_loss_hist, valid_f1_hist, valid_acc_hist, valid_loss_hist, lr_hist, epoch
+            )
+            return
     
     trainer.plots(
         tr_f1_hist, tr_acc_hist, tr_loss_hist, valid_f1_hist, valid_acc_hist, valid_loss_hist, lr_hist, params['num_epochs']
     )
 
-    torch.save(model.state_dict(), "/content/drive/MyDrive/ML_project2/models/advanced_model.pth")
-
 if __name__ == "__main__":
-    #print(f'patch size: {constants.IMG_PATCH_SIZE}')
     main()
