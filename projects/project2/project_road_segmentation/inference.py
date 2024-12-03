@@ -33,8 +33,9 @@ class TestModel:
             preds = []
             for data in test_loader:
                 data = data.to(self.device)
-                output = self.model(data)
-                pred = output.argmax(dim=1, keepdim=True) 
+                output = self.model(data).squeeze(1)
+                prob = torch.sigmoid(output)
+                pred = (prob > constants.P_THRESHOLD).float().to(self.device)
                 preds.extend(pred.cpu().numpy())
         
         pred_imgs = [
@@ -55,10 +56,10 @@ class TestModel:
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = models.adv_cnn()
-    model.load_state_dict(torch.load("models/adv_cnn_128_with_aug.pth", map_location=torch.device(device)))
+    model = models.UNet()
+    model.load_state_dict(torch.load("models/UNet_80_with_aug.pth", map_location=torch.device(device)))
     path_test_imgs = 'testing/'
-    path_submission = 'submissions/adv_cnn_128_with_aug.csv'
+    path_submission = 'submissions/Dummy_test.csv'
 
     # Compute mean and standard deviation over whole training set, only needs to be done once
     """train_data = data_process.TrainImgsDataset(path_imgs = 'training/images/', 

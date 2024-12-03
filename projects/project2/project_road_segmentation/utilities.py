@@ -59,16 +59,13 @@ def img_crop(im, w, h, gt = False):
             list_patches.append(im_patch)
     return list_patches
 
-def extract_data(filename, num_images, train):
+def extract_data(filename, imgs_idx):
     """Extract the images into a 4D tensor [image index, y, x, channels].
     Values are rescaled from [0, 255] down to [-0.5, 0.5].
     """
     imgs = []
 
-    start_img = 1 if train else 101 - num_images
-    stop_img = num_images + 1 if train else 101
-
-    for i in range(start_img, stop_img):
+    for i in imgs_idx:
         imageid = "satImage_%.3d" % i
         image_filename = filename + imageid + ".png"
         if os.path.isfile(image_filename):
@@ -92,23 +89,26 @@ def extract_data(filename, num_images, train):
     return torch.tensor(np.array(data))
 
 # Assign a label to a patch v. Returns 1 for road and 0 for background    
-def patch_to_label(patch):
-    foreground_threshold = 0.25
+"""def patch_to_label(patch):
+    foreground_threshold = constants.FOREGROUND_THRESHOLD
     df = np.mean(patch)
     if df > foreground_threshold:
+        return 1
+    else:
+        return 0"""
+    
+def pixel_to_label(pixel):
+    foreground_threshold = constants.FOREGROUND_THRESHOLD
+    if pixel > foreground_threshold:
         return 1
     else:
         return 0
     
 # Extract label images
-def extract_labels(filename, num_images, train):
-    """Extract the labels into a 1-hot matrix [image index, label index]."""
+"""def extract_labels(filename, imgs_idx):
     gt_imgs = []
 
-    start_img = 1 if train else 101 - num_images
-    stop_img = num_images + 1 if train else 101
-
-    for i in range(start_img, stop_img):
+    for i in imgs_idx:
         imageid = "satImage_%.3d" % i
         image_filename = filename + imageid + ".png"
         if os.path.isfile(image_filename):
@@ -132,6 +132,36 @@ def extract_labels(filename, num_images, train):
         [patch_to_label(data[i]) for i in range(len(data))]
     )
 
+    return torch.tensor(labels).long()"""
+
+def extract_labels(filename, imgs_idx):
+    gt_imgs = []
+
+    for i in imgs_idx:
+        imageid = "satImage_%.3d" % i
+        image_filename = filename + imageid + ".png"
+        if os.path.isfile(image_filename):
+            img = mpimg.imread(image_filename)
+            gt_imgs.append(img)
+        else:
+            print("File " + image_filename + " does not exist")
+
+    num_images = len(gt_imgs)
+    gt_patches = [
+        img_crop(gt_imgs[i], constants.STANDARD_PATCH_SIZE, constants.STANDARD_PATCH_SIZE, gt = True) for i in range(num_images)
+    ]
+    data = np.asarray(
+        [
+            gt_patches[i][j]
+            for i in range(len(gt_patches))
+            for j in range(len(gt_patches[i]))
+        ]
+    )
+
+    labels = np.asarray(
+        [(data[i] > constants.FOREGROUND_THRESHOLD).astype(float) for i in range(len(data))]
+    )
+
     return torch.tensor(labels).long()
 
 def compute_mean_std(loader):
@@ -151,13 +181,22 @@ def compute_mean_std(loader):
 
 def get_dataloaders(num_images, batch_size, data_aug):
 
+    np.random.seed(12)
+    tot_imgs = 100
+    all_idx = np.arange(1, tot_imgs + 1)
+    nbr_train_imgs = int(0.85 * num_images)
+    nbr_valid_imgs = int(0.15 * num_images)
+
+    train_idx = np.random.choice(all_idx, size = nbr_train_imgs, replace=False)
+    remaining_indices = np.setdiff1d(all_idx, train_idx)
+    valid_idx = np.random.choice(remaining_indices, size = nbr_valid_imgs, replace=False)
+
     train_data = data_process.TrainImgsDataset(path_imgs = 'training/images/', 
-                                   path_gts = 'training/groundtruth/', 
-                                   train = True,
-                                   num_images = num_images, 
+                                   path_gts = 'training/groundtruth/',
+                                   imgs_idx = train_idx, 
                                    transform = False,
                                    aug = data_aug,
-                                   aug_factor = 1.1)
+                                   aug_factor = 1.05)
     train_data.excecute()
 
     mean_std_loader = torch.utils.data.DataLoader(
@@ -186,11 +225,10 @@ def get_dataloaders(num_images, batch_size, data_aug):
 
     valid_data = data_process.TrainImgsDataset(path_imgs = 'training/images/', 
                                   path_gts = 'training/groundtruth/', 
-                                  train = False,
-                                  num_images = max(1, int(np.round(num_images/4, 0))), 
+                                  imgs_idx = valid_idx, 
                                   transform = transform,
                                   aug = False,
-                                  aug_factor = 1)
+                                  aug_factor = 1.2)
     valid_data.excecute()
 
     valid_loader = torch.utils.data.DataLoader(
@@ -207,7 +245,6 @@ def get_dataloaders(num_images, batch_size, data_aug):
 def load_test_data(path):
     imgs = []
     num_imgs = 50
-
     for i in range(1, num_imgs + 1):
         imageid = f"test_{i}"
         image_filename = path + imageid + "/" + imageid + ".png"
@@ -239,6 +276,13 @@ def label_to_img(imgwidth, imgheight, w, h, labels):
             idx = idx + 1
     return im
 
+def patch_to_label(patch):
+    df = np.mean(patch)
+    if df > constants.FOREGROUND_THRESHOLD:
+        return 1
+    else:
+        return 0
+
 def mask_to_submission_strings(img, idx):
     """Reads a single image and outputs the strings that should go into the submission file"""
     patch_size = 16
@@ -254,3 +298,10 @@ def masks_to_submission(submission_filename, imgs):
         f.write('id,prediction\n')
         for i in range(len(imgs)):
             f.writelines('{}\n'.format(s) for s in mask_to_submission_strings(imgs[i], i+1))
+
+
+
+
+
+
+   

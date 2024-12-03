@@ -21,10 +21,12 @@ class TrainModel:
             factor = 0.1,  
             patience = 2,   
         )
-        self.criterion = torch.nn.CrossEntropyLoss(weight = params['class_weights'].to(self.device))
+        #self.criterion = torch.nn.CrossEntropyLoss(weight = params['class_weights'].to(self.device))
+        self.criterion = torch.nn.BCEWithLogitsLoss()
     
     def evaluate_pred(self, output, target):
-        pred = output.argmax(dim = 1, keepdim = True).to(self.device)
+        prob = torch.sigmoid(output)
+        pred = (prob > constants.P_THRESHOLD).float().to(self.device)
         pred = pred.view(-1)
         target = target.view(-1)
 
@@ -49,9 +51,9 @@ class TrainModel:
 
         for batch_idx, (data, target) in enumerate(train_loader):
             data = data.to(self.device)
-            target = target.to(self.device)
+            target = target.to(self.device).float()
             self.optimizer.zero_grad()
-            output = self.model(data)
+            output = self.model(data).squeeze(1)
             loss = self.criterion(output, target)
             loss.backward()
             self.optimizer.step()
@@ -82,8 +84,8 @@ class TrainModel:
         tot_tp, tot_tn, tot_fp, tot_fn = 0, 0, 0, 0
 
         for data, target in valid_loader:
-            data, target = data.to(self.device), target.to(self.device)
-            output = self.model(data)
+            data, target = data.to(self.device), target.to(self.device).float()
+            output = self.model(data).squeeze(1)
             valid_loss += self.criterion(output, target).item() * len(data)
 
             tp, tn, fp, fn = self.evaluate_pred(output, target)
@@ -146,15 +148,15 @@ class TrainModel:
 def main():
     print(f'Patch size: {constants.IMG_PATCH_SIZE}')
     params = {
-        'lr': 1e-3,
-        'weight_decay': 1e-3,
-        'num_epochs': 10,
-        'num_images': 80,
+        'lr': 5e-4,
+        'weight_decay': 0,
+        'num_epochs': 1,
+        'num_images': 10,
         'data_augmentation': False,
     }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = models.ResNet()
+    model = models.UNet()
     train_loader, valid_loader, class_weights = utilities.get_dataloaders(
         num_images = params['num_images'], 
         batch_size = 128,
@@ -181,14 +183,14 @@ def main():
         valid_f1_hist.append(valid_f1)
         valid_acc_hist.append(valid_acc)
 
-        if (len(valid_loss_hist) > 1) and (valid_loss_hist[-1] > valid_loss_hist[-2]):
+        if (len(valid_f1_hist) > 1) and (valid_f1_hist[-1] < valid_f1_hist[-2]):
             count += 1
         else:
-            torch.save(model.state_dict(), "/content/drive/MyDrive/ML_project2/models/ResNet_128_no_aug.pth")
+            torch.save(model.state_dict(), "/content/drive/MyDrive/ML_project2/models/UNet_80_with_aug.pth")
             count = 0
         
         if count >= patience:
-            print(f'Training stopped as the validation loss has increased for {patience} consecutive epochs')
+            print(f'Training stopped as the validation f1-score has decreased for {patience} consecutive epochs')
             trainer.plots(
                 tr_f1_hist, tr_acc_hist, tr_loss_hist, valid_f1_hist, valid_acc_hist, valid_loss_hist, lr_hist, epoch
             )

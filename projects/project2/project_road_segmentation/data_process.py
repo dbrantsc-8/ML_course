@@ -26,8 +26,7 @@ class TrainImgsDataset(Dataset):
             self, 
             path_imgs, 
             path_gts, 
-            train,
-            num_images,
+            imgs_idx,
             transform,
             aug,
             aug_factor,
@@ -38,20 +37,19 @@ class TrainImgsDataset(Dataset):
        self.weights = None
        self.path_imgs = path_imgs
        self.path_gts = path_gts
-       self.train = train
-       self.num_images = num_images
+       self.imgs_idx = imgs_idx
        self.transform = transform
        self.aug = aug
        self.aug_factor = aug_factor
 
     def get_data(self):
-        self.patches = utilities.extract_data(self.path_imgs, self.num_images, self.train) 
+        self.patches = utilities.extract_data(self.path_imgs, self.imgs_idx) 
 
     def get_labels(self):
-        self.labels = utilities.extract_labels(self.path_gts, self.num_images, self.train)  
+        self.labels = utilities.extract_labels(self.path_gts, self.imgs_idx)  
 
     def get_weights(self): 
-        class_counts = torch.bincount(self.labels).float()
+        class_counts = torch.bincount(torch.flatten(self.labels)).float()
         self.weights = 1.0 / class_counts
         self.weights /= self.weights.min()
     
@@ -64,7 +62,7 @@ class TrainImgsDataset(Dataset):
         
         # Blurring
         blur_transform = torchvision.transforms.GaussianBlur(kernel_size = 5, sigma = 0.5)
-        self.apply_transform(blur_transform, select_idx)
+        #self.apply_transform(blur_transform, select_idx)
         
         # Rotate
         pad_transform = torchvision.transforms.Pad(int(0.2*constants.IMG_PATCH_SIZE), padding_mode = "reflect")
@@ -79,12 +77,12 @@ class TrainImgsDataset(Dataset):
         
         # Color distort
         jitter_transform = torchvision.transforms.ColorJitter(brightness = 0.35, contrast = 0.35, saturation = 0.35, hue = 0.12)
-        self.apply_transform(jitter_transform, select_idx)
+        #self.apply_transform(jitter_transform, select_idx)
 
         # Cutout
         mean = self.patches[select_idx].mean().item()
         cutout_transform = CutoutTransform(cutout_size = int(0.3 * constants.IMG_PATCH_SIZE), fill_val = mean)
-        self.apply_transform(cutout_transform, select_idx)
+        #self.apply_transform(cutout_transform, select_idx)
 
     
     def apply_transform(self, transform, select_idx):
