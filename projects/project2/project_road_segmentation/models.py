@@ -137,23 +137,22 @@ def UNet():
     class UNet(torch.nn.Module):
         def __init__(self):
             super(UNet, self).__init__()
-            self.enc1 = Encoder(in_channels = 3, out_channels = 64)
-            self.enc2 = Encoder(in_channels = 64, out_channels = 128)
-            self.enc3 = Encoder(in_channels = 128, out_channels = 256)
-            self.enc4 = Encoder(in_channels = 256, out_channels = 512)
-            #self.enc5 = Encoder(in_channels = 128, out_channels = 256)
+            self.enc1 = Encoder(in_channels = 3, out_channels = 16)
+            self.enc2 = Encoder(in_channels = 16, out_channels = 32)
+            self.enc3 = Encoder(in_channels = 32, out_channels = 64)
+            self.enc4 = Encoder(in_channels = 64, out_channels = 128)
 
-            self.bottleneck_conv = torch.nn.Conv2d(in_channels = 512, out_channels = 1024, kernel_size = 3, padding = 1)
-            self.bottleneck_batch = torch.nn.BatchNorm2d(1024)
+            self.bottleneck_conv1 = torch.nn.Conv2d(in_channels = 128, out_channels = 256, kernel_size = 3, padding = 1)
+            self.bottleneck_conv2 = torch.nn.Conv2d(in_channels = 256, out_channels = 256, kernel_size = 3, padding = 1)
+            self.bottleneck_batch = torch.nn.BatchNorm2d(256)
             self.bottleneck_relu = torch.nn.ReLU()
 
-            self.dec1 = Decoder(in_channels = 1024, out_channels = 512)
-            self.dec2 = Decoder(in_channels = 512, out_channels = 256)
-            self.dec3 = Decoder(in_channels = 256, out_channels = 128)
-            self.dec4 = Decoder(in_channels = 128, out_channels = 64)
+            self.dec1 = Decoder(in_channels = 256, out_channels = 128)
+            self.dec2 = Decoder(in_channels = 128, out_channels = 64)
+            self.dec3 = Decoder(in_channels = 64, out_channels = 32)
+            self.dec4 = Decoder(in_channels = 32, out_channels = 16)
             
-            self.final_conv = torch.nn.Conv2d(in_channels = 64, out_channels = 1, kernel_size = 1)
-            self.crop = transforms.CenterCrop((constants.STANDARD_PATCH_SIZE, constants.STANDARD_PATCH_SIZE))
+            self.final_conv = torch.nn.Conv2d(in_channels = 16, out_channels = 1, kernel_size = 1)
         
         def forward(self, x):
             enc1, skip1 = self.enc1(x)
@@ -161,19 +160,19 @@ def UNet():
             enc3, skip3 = self.enc3(enc2)
             enc4, skip4 = self.enc4(enc3)
 
-            b = self.bottleneck_relu(self.bottleneck_batch(self.bottleneck_conv(enc4)))
+            b = self.bottleneck_batch(self.bottleneck_relu(self.bottleneck_conv1(enc4)))
+            b = self.bottleneck_batch(self.bottleneck_relu(self.bottleneck_conv2(b)))
 
             dec1 = self.dec1(b, skip4)
             dec2 = self.dec2(dec1, skip3)
             dec3 = self.dec3(dec2, skip2)
             dec4 = self.dec4(dec3, skip1)
-            crop = self.crop(self.final_conv(dec4))
-            return crop
+            return torch.nn.Sigmoid()(self.final_conv(dec4))
 
     class Encoder(torch.nn.Module):
         def __init__(self, in_channels, out_channels):
             super(Encoder, self).__init__()
-            self.dropout_percentage = 0.2
+            self.dropout_percentage = 0.1
             self.relu = torch.nn.ReLU()
             self.conv1 = torch.nn.Conv2d(in_channels, out_channels, kernel_size = 3, padding = 1)
             self.batchnorm1 = torch.nn.BatchNorm2d(out_channels)
@@ -183,8 +182,8 @@ def UNet():
             self.maxpool = torch.nn.MaxPool2d(kernel_size = 2, stride = 2)
 
         def forward(self, x):
-            x = self.relu(self.batchnorm1(self.conv1(x)))
-            x = self.relu(self.batchnorm2(self.conv2(x)))
+            x = self.batchnorm1(self.relu(self.conv1(x)))
+            x = self.batchnorm2(self.relu(self.conv2(x)))
             out = self.maxpool(self.dropout(x))
             return out, x
 
@@ -201,8 +200,8 @@ def UNet():
         def forward(self, x, skip):
             x = self.deconv(x)
             x = torch.cat([x, skip], dim = 1)
-            x = self.relu(self.batchnorm1(self.conv1(x)))
-            x = self.relu(self.batchnorm2(self.conv2(x)))
+            x = self.batchnorm1(self.relu(self.conv1(x)))
+            x = self.batchnorm2(self.relu(self.conv2(x)))
             return x
 
     return UNet()

@@ -10,10 +10,9 @@ class TrainModel:
         self.model = model.to(device)
         self.device = device
         self.params = params
-        self.optimizer = torch.optim.AdamW(
+        self.optimizer = torch.optim.Adam(
             model.parameters(), 
             lr = params['lr'], 
-            weight_decay = params['weight_decay']
         )
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
@@ -21,12 +20,10 @@ class TrainModel:
             factor = 0.1,  
             patience = 2,   
         )
-        #self.criterion = torch.nn.CrossEntropyLoss(weight = params['class_weights'].to(self.device))
         self.criterion = torch.nn.BCEWithLogitsLoss()
     
     def evaluate_pred(self, output, target):
-        prob = torch.sigmoid(output)
-        pred = (prob > constants.P_THRESHOLD).float().to(self.device)
+        pred = (output > constants.P_THRESHOLD).float().to(self.device)
         pred = pred.view(-1)
         target = target.view(-1)
 
@@ -51,9 +48,9 @@ class TrainModel:
 
         for batch_idx, (data, target) in enumerate(train_loader):
             data = data.to(self.device)
-            target = target.to(self.device).float()
+            target = target.to(self.device)
             self.optimizer.zero_grad()
-            output = self.model(data).squeeze(1)
+            output = self.model(data)
             loss = self.criterion(output, target)
             loss.backward()
             self.optimizer.step()
@@ -65,7 +62,6 @@ class TrainModel:
             f1_hist.append(f1)
             acc_hist.append(acc)
             lr_hist.append(self.scheduler.get_last_lr()[0])
-
             if batch_idx % (len(train_loader.dataset) // len(data) // 10) == 0:
                 print(
                     f"Train Epoch: {epoch}-{batch_idx:03d} "
@@ -84,8 +80,8 @@ class TrainModel:
         tot_tp, tot_tn, tot_fp, tot_fn = 0, 0, 0, 0
 
         for data, target in valid_loader:
-            data, target = data.to(self.device), target.to(self.device).float()
-            output = self.model(data).squeeze(1)
+            data, target = data.to(self.device), target.to(self.device)
+            output = self.model(data)
             valid_loss += self.criterion(output, target).item() * len(data)
 
             tp, tn, fp, fn = self.evaluate_pred(output, target)
@@ -146,29 +142,26 @@ class TrainModel:
         
 
 def main():
-    print(f'Patch size: {constants.IMG_PATCH_SIZE}')
     params = {
         'lr': 5e-4,
-        'weight_decay': 0,
-        'num_epochs': 1,
-        'num_images': 10,
-        'data_augmentation': False,
+        'num_epochs': 10,
+        'num_images': 100,
     }
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = constants.DEVICE
     model = models.UNet()
-    train_loader, valid_loader, class_weights = utilities.get_dataloaders(
+    path_model = "/content/drive/MyDrive/ML_project2/models/UNet_80_with_aug.pth"
+
+    train_loader, valid_loader = utilities.get_dataloaders(
         num_images = params['num_images'], 
-        batch_size = 128,
+        batch_size = 16,
         data_aug = params['data_augmentation']
     )
-    params['class_weights'] = class_weights
 
     trainer = TrainModel(model, params, device)
 
     tr_loss_hist, tr_f1_hist, tr_acc_hist, lr_hist = [], [], [], []
     valid_loss_hist, valid_f1_hist, valid_acc_hist = [], [], []
-    patience = 4
+    patience = 3
     count = 0
 
     for epoch in range(1, params['num_epochs'] + 1):
@@ -186,7 +179,7 @@ def main():
         if (len(valid_f1_hist) > 1) and (valid_f1_hist[-1] < valid_f1_hist[-2]):
             count += 1
         else:
-            torch.save(model.state_dict(), "/content/drive/MyDrive/ML_project2/models/UNet_80_with_aug.pth")
+            torch.save(model.state_dict(), path_model)
             count = 0
         
         if count >= patience:
